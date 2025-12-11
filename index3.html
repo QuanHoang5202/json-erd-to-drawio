@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>DB Schema JSON → draw.io Table</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .app {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 420px;
+            border-right: 1px solid #ddd;
+            padding: 16px;
+            box-sizing: border-box;
+            background: #fff;
+        }
+
+        .sidebar h1 {
+            font-size: 18px;
+            margin: 0 0 10px;
+        }
+
+        .sidebar label {
+            font-size: 13px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .sidebar textarea {
+            width: 100%;
+            height: 260px;
+            resize: vertical;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+            padding: 8px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        .sidebar .actions {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            background: #0056b3;
+            color: #fff;
+        }
+
+        .btn.secondary {
+            background: #6c757d;
+        }
+
+        .btn:hover {
+            filter: brightness(0.9);
+        }
+
+        .error {
+            color: #b00020;
+            font-size: 12px;
+            margin-top: 6px;
+            white-space: pre-line;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+            padding: 24px;
+            box-sizing: border-box;
+            overflow: auto;
+
+            background-image:
+                linear-gradient(#e5e5e5 1px, transparent 1px),
+                linear-gradient(90deg, #e5e5e5 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Preview bảng đúng style draw.io */
+        .preview-table {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #000;
+            font-size: 12px;
+            margin: 0 16px 16px 0;
+        }
+
+        .preview-header {
+            text-align: center;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-bottom: 1px solid #000;
+            background: #f5f5f5;
+        }
+
+        .preview-row {
+            display: flex;
+            border-top: 1px solid #000;
+        }
+
+        .preview-cell {
+            padding: 3px 6px;
+            border-left: 1px solid #000;
+            white-space: nowrap;
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .preview-row:first-of-type .preview-cell {
+            font-weight: 700;
+            /* header PK / Field */
+        }
+
+        .preview-cell:first-child {
+            width: 40px;
+            border-left: none;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .preview-cell:nth-child(2) {
+            min-width: 160px;
+        }
+
+        .preview-row:first-of-type .preview-cell:nth-child(2) {
+            text-decoration: underline;
+            /* giống UniqueID trong hình */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <h1>DB Schema JSON → draw.io Table</h1>
+
+            <label for="jsonInput">Dán JSON schema (có <code>tables[]</code>, <code>fields[]</code>)</label>
+            <textarea id="jsonInput">
+{
+  "tables": [
+    {
+      "name": "Phiếu đề nghị nhập kho",
+      "x": -551.0163852083961,
+      "y": -458.87313041358607,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary": false,
+          "unique": true
+        },
+        {
+          "name": "Đơn vị",
+          "type": "VARCHAR",
+          "primary": false,
+          "unique": false
+        },
+        {
+          "name": "Mã đề nghị",
+          "type": "VARCHAR",
+          "primary": true,
+          "unique": true
+        }
+      ]
+    }
+  ]
+}
+        </textarea>
+
+            <div class="actions">
+                <button class="btn" id="previewBtn">Preview</button>
+                <button class="btn secondary" id="downloadBtn">Tải file .drawio</button>
+            </div>
+
+            <div class="hint">
+                • JSON của bạn giống ví dụ: <code>{ "tables": [ { name, x, y, fields[] } ] }</code><br>
+                • Mỗi field: dùng <code>name</code>, <code>type</code>, <code>primary</code>, <code>unique</code>.<br>
+                • Bên trong draw.io các bảng sẽ là table shape đúng chuẩn (header + PK/Field + từng dòng).
+            </div>
+
+            <div id="errorBox" class="error"></div>
+        </div>
+
+        <div class="canvas" id="canvas"></div>
+    </div>
+
+    <script>
+        const jsonInput = document.getElementById("jsonInput");
+        const previewBtn = document.getElementById("previewBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const errorBox = document.getElementById("errorBox");
+        const canvas = document.getElementById("canvas");
+
+        let lastTables = null;
+
+        function escapeXml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        }
+
+        // Đọc JSON đúng format bạn gửi: { tables: [ { name, x, y, fields[] } ] }
+        function parseTables() {
+            errorBox.textContent = "";
+            try {
+                const text = jsonInput.value.trim();
+                if (!text) throw new Error("JSON trống.");
+                const obj = JSON.parse(text);
+
+                let rawTables;
+                if (obj.tables && Array.isArray(obj.tables)) {
+                    rawTables = obj.tables;
+                } else if (Array.isArray(obj)) {
+                    rawTables = obj;
+                } else {
+                    rawTables = [obj];
+                }
+
+                const tables = rawTables.map(t => ({
+                    name: t.name || "Table",
+                    x: typeof t.x === "number" ? t.x : 0,
+                    y: typeof t.y === "number" ? t.y : 0,
+                    fields: (t.fields || []).map(f => ({
+                        name: f.name || "",
+                        type: f.type || "",
+                        isPk: !!f.primary,
+                        isUnique: !!f.unique
+                    }))
+                }));
+
+                lastTables = tables;
+                return tables;
+            } catch (e) {
+                errorBox.textContent = "Lỗi parse JSON:\n" + e.message;
+                lastTables = null;
+                return null;
+            }
+        }
+
+        // Preview theo style: header, rồi PK | Field, rồi các dòng
+        //         function renderPreview(tables) {
+        //             canvas.innerHTML = "";
+        //             if (!tables) return;
+
+        //             tables.forEach(tbl => {
+        //                 const box = document.createElement("div");
+        //                 box.className = "preview-table";
+
+        //                 const header = document.createElement("div");
+        //                 header.className = "preview-header";
+        //                 header.textContent = tbl.name || "Table";
+        //                 box.appendChild(header);
+
+        //                 // row header: PK / Field
+        //                 const headerRow = document.createElement("div");
+        //                 headerRow.className = "preview-row";
+
+        //                 const pkHead = document.createElement("div");
+        //                 pkHead.className = "preview-cell";
+        //                 pkHead.textContent = "PK";
+
+        //                 const fieldHead = document.createElement("div");
+        //                 fieldHead.className = "preview-cell";
+        //                 fieldHead.textContent = "Field";
+
+        //                 headerRow.appendChild(pkHead);
+        //                 headerRow.appendChild(fieldHead);
+        //                 box.appendChild(headerRow);
+
+        //                 // data rows
+        //                 (tbl.fields || []).forEach(f => {
+        //                     const row = document.createElement("div");
+        //                     row.className = "preview-row";
+
+        //                     const pkCell = document.createElement("div");
+        //                     pkCell.className = "preview-cell";
+        //                     if (f.isPk) {
+        //                         pkCell.textContent = "PK";
+        //                     } else if (f.isUnique) {
+        //                         pkCell.textContent = "UQ";
+        //                     } else {
+        //                         pkCell.textContent = "";
+        //                     }
+
+        //                     const fieldCell = document.createElement("div");
+        //                     fieldCell.className = "preview-cell";
+        //                     fieldCell.textContent = f.name + (f.type ? " : " + f.type : "");
+
+        //                     row.appendChild(pkCell);
+        //                     row.appendChild(fieldCell);
+        //                     box.appendChild(row);
+        //                 });
+
+        //                 canvas.appendChild(box);
+        //             });
+        //         }
+
+        //         // Sinh XML draw.io với shape=table chuẩn
+        //         function generateDrawioXml(tables) {
+        //             let idCounter = 2;
+        //             const nextId = () => (idCounter++).toString();
+
+        //             const tableWidth = 260;
+        //             const headerHeight = 30;  // header chứa tên bảng
+        //             const rowHeight = 26;     // mỗi dòng trong bảng (PK/Field + fields)
+        //             const col1Width = 60;     // cột PK
+        //             const col2Width = tableWidth - col1Width;
+
+        //             // offset x,y để tránh bị số âm
+        //             const xs = [];
+        //             const ys = [];
+        //             tables.forEach(t => {
+        //                 if (typeof t.x === "number") xs.push(t.x);
+        //                 if (typeof t.y === "number") ys.push(t.y);
+        //             });
+        //             const minX = xs.length ? Math.min(...xs) : 0;
+        //             const minY = ys.length ? Math.min(...ys) : 0;
+        //             const baseX = 60 - minX;
+        //             const baseY = 60 - minY;
+
+        //             let cellsXml = `
+        //         <mxCell id="0"/>
+        //         <mxCell id="1" parent="0"/>`;
+
+        //             tables.forEach((tbl, index) => {
+        //                 const fields = tbl.fields || [];
+        //                 const rowsCount = 1 + fields.length; // 1 row header + n fields
+        //                 const totalHeight = headerHeight + rowsCount * rowHeight;
+
+        //                 const x = typeof tbl.x === "number"
+        //                     ? Math.round(tbl.x + baseX)
+        //                     : 60 + index * (tableWidth + 40);
+        //                 const y = typeof tbl.y === "number"
+        //                     ? Math.round(tbl.y + baseY)
+        //                     : 60;
+
+        //                 const tableId = nextId();
+
+        //                 // cell table chính
+        //                 cellsXml += `
+        //         <mxCell id="${tableId}" value="${escapeXml(tbl.name || "Table")}"
+        //           style="shape=table;startSize=${headerHeight};container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=1;fontStyle=1;align=center;resizeLast=1;html=1;strokeColor=default;"
+        //           vertex="1" parent="1">
+        //           <mxGeometry x="${x}" y="${y}" width="${tableWidth}" height="${totalHeight}" as="geometry"/>
+        //         </mxCell>`;
+
+        //                 // header row: PK | Field
+        //                 const headerRowId = nextId();
+        //                 cellsXml += `
+        //         <mxCell id="${headerRowId}" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="${tableId}">
+        //           <mxGeometry y="${headerHeight}" width="${tableWidth}" height="${rowHeight}" as="geometry"/>
+        //         </mxCell>`;
+
+        //                 const pkHeaderId = nextId();
+        //                 cellsXml += `
+        //         <mxCell id="${pkHeaderId}" value="PK" style="shape=partialRectangle;connectable=0;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${headerRowId}">
+        //           <mxGeometry width="${col1Width}" height="${rowHeight}" as="geometry">
+        //             <mxRectangle width="${col1Width}" height="${rowHeight}" as="alternateBounds"/>
+        //           </mxGeometry>
+        //         </mxCell>`;
+
+        //                 const fieldHeaderId = nextId();
+        //                 cellsXml += `
+        //         <mxCell id="${fieldHeaderId}" value="Field" style="shape=partialRectangle;connectable=0;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${headerRowId}">
+        //           <mxGeometry x="${col1Width}" width="${col2Width}" height="${rowHeight}" as="geometry">
+        //             <mxRectangle width="${col2Width}" height="${rowHeight}" as="alternateBounds"/>
+        //           </mxGeometry>
+        //         </mxCell>`;
+
+        //                 // từng field
+        //                 fields.forEach((f, idx) => {
+        //                     const rowId = nextId();
+        //                     const yRow = headerHeight + (idx + 1) * rowHeight;
+
+        //                     cellsXml += `
+        //         <mxCell id="${rowId}" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="${tableId}">
+        //           <mxGeometry y="${yRow}" width="${tableWidth}" height="${rowHeight}" as="geometry"/>
+        //         </mxCell>`;
+
+        //                     const pkText = f.isPk ? "PK" : (f.isUnique ? "UQ" : "");
+        //                     const pkCellId = nextId();
+        //                     cellsXml += `
+        //         <mxCell id="${pkCellId}" value="${escapeXml(pkText)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=center;verticalAlign=middle;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+        //           <mxGeometry width="${col1Width}" height="${rowHeight}" as="geometry">
+        //             <mxRectangle width="${col1Width}" height="${rowHeight}" as="alternateBounds"/>
+        //           </mxGeometry>
+        //         </mxCell>`;
+
+        //                     const fieldLabel = f.name + (f.type ? " : " + f.type : "");
+        //                     const fieldCellId = nextId();
+        //                     cellsXml += `
+        //         <mxCell id="${fieldCellId}" value="${escapeXml(fieldLabel)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+        //           <mxGeometry x="${col1Width}" width="${col2Width}" height="${rowHeight}" as="geometry">
+        //             <mxRectangle width="${col2Width}" height="${rowHeight}" as="alternateBounds"/>
+        //           </mxGeometry>
+        //         </mxCell>`;
+        //                 });
+        //             });
+
+        //             const xml =
+        //                 `<mxfile host="app.diagrams.net">
+        //   <diagram name="ERD">
+        //     <mxGraphModel dx="1030" dy="583" grid="1" gridSize="10" guides="1" tooltips="1"
+        //                   connect="1" arrows="1" fold="1" page="1" pageScale="1"
+        //                   pageWidth="827" pageHeight="1169" math="0">
+        //       <root>${cellsXml}
+        //       </root>
+        //     </mxGraphModel>
+        //   </diagram>
+        // </mxfile>`;
+
+        //             return xml;
+        //         }
+
+
+
+        function renderPreview(tables) {
+            canvas.innerHTML = "";
+            if (!tables) return;
+
+            tables.forEach(tbl => {
+                const box = document.createElement("div");
+                box.className = "preview-table";
+
+                const header = document.createElement("div");
+                header.className = "preview-header";
+                header.textContent = tbl.name || "Table";
+                box.appendChild(header);
+
+                // CHỈ CÓ CÁC DÒNG FIELD, KHÔNG CÓ DÒNG "PK | Field"
+                (tbl.fields || []).forEach(f => {
+                    const row = document.createElement("div");
+                    row.className = "preview-row";
+
+                    const pkCell = document.createElement("div");
+                    pkCell.className = "preview-cell";
+                    if (f.isPk) {
+                        pkCell.textContent = "PK";
+                    } else if (f.isUnique) {
+                        pkCell.textContent = "UQ";
+                    } else {
+                        pkCell.textContent = "";
+                    }
+
+                    const fieldCell = document.createElement("div");
+                    fieldCell.className = "preview-cell";
+                    fieldCell.textContent = f.name + (f.type ? " : " + f.type : "");
+
+                    row.appendChild(pkCell);
+                    row.appendChild(fieldCell);
+                    box.appendChild(row);
+                });
+
+                canvas.appendChild(box);
+            });
+        }
+
+
+
+        function generateDrawioXml(tables) {
+            let idCounter = 2;
+            const nextId = () => (idCounter++).toString();
+
+            const tableWidth = 260;
+            const headerHeight = 30;  // header chứa tên bảng
+            const rowHeight = 26;     // mỗi dòng field
+            const col1Width = 60;     // cột PK/UQ
+            const col2Width = tableWidth - col1Width;
+
+            // offset x,y để tránh âm
+            const xs = [];
+            const ys = [];
+            tables.forEach(t => {
+                if (typeof t.x === "number") xs.push(t.x);
+                if (typeof t.y === "number") ys.push(t.y);
+            });
+            const minX = xs.length ? Math.min(...xs) : 0;
+            const minY = ys.length ? Math.min(...ys) : 0;
+            const baseX = 60 - minX;
+            const baseY = 60 - minY;
+
+            let cellsXml = `
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>`;
+
+            tables.forEach((tbl, index) => {
+                const fields = tbl.fields || [];
+                const rowsCount = fields.length; // KHÔNG CÒN DÒNG HEADER PK/FIELD
+                const totalHeight = headerHeight + rowsCount * rowHeight;
+
+                const x = typeof tbl.x === "number"
+                    ? Math.round(tbl.x + baseX)
+                    : 60 + index * (tableWidth + 40);
+                const y = typeof tbl.y === "number"
+                    ? Math.round(tbl.y + baseY)
+                    : 60;
+
+                const tableId = nextId();
+
+                // table chính
+                cellsXml += `
+        <mxCell id="${tableId}" value="${escapeXml(tbl.name || "Table")}"
+          style="shape=table;startSize=${headerHeight};container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=1;fontStyle=1;align=center;resizeLast=1;html=1;strokeColor=default;"
+          vertex="1" parent="1">
+          <mxGeometry x="${x}" y="${y}" width="${tableWidth}" height="${totalHeight}" as="geometry"/>
+        </mxCell>`;
+
+                // từng field là 1 tableRow
+                fields.forEach((f, idx) => {
+                    const rowId = nextId();
+                    const yRow = headerHeight + idx * rowHeight;
+
+                    cellsXml += `
+        <mxCell id="${rowId}" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="${tableId}">
+          <mxGeometry y="${yRow}" width="${tableWidth}" height="${rowHeight}" as="geometry"/>
+        </mxCell>`;
+
+                    const pkText = f.isPk ? "PK" : (f.isUnique ? "UQ" : "");
+                    const pkCellId = nextId();
+                    cellsXml += `
+        <mxCell id="${pkCellId}" value="${escapeXml(pkText)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=center;verticalAlign=middle;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+          <mxGeometry width="${col1Width}" height="${rowHeight}" as="geometry">
+            <mxRectangle width="${col1Width}" height="${rowHeight}" as="alternateBounds"/>
+          </mxGeometry>
+        </mxCell>`;
+
+                    const fieldLabel = f.name + (f.type ? " : " + f.type : "");
+                    const fieldCellId = nextId();
+                    cellsXml += `
+        <mxCell id="${fieldCellId}" value="${escapeXml(fieldLabel)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+          <mxGeometry x="${col1Width}" width="${col2Width}" height="${rowHeight}" as="geometry">
+            <mxRectangle width="${col2Width}" height="${rowHeight}" as="alternateBounds"/>
+          </mxGeometry>
+        </mxCell>`;
+                });
+            });
+
+            const xml =
+                `<mxfile host="app.diagrams.net">
+  <diagram name="ERD">
+    <mxGraphModel dx="1030" dy="583" grid="1" gridSize="10" guides="1" tooltips="1"
+                  connect="1" arrows="1" fold="1" page="1" pageScale="1"
+                  pageWidth="827" pageHeight="1169" math="0">
+      <root>${cellsXml}
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+
+            return xml;
+        }
+
+
+        previewBtn.addEventListener("click", () => {
+            const tables = parseTables();
+            if (!tables) return;
+            renderPreview(tables);
+        });
+
+        downloadBtn.addEventListener("click", () => {
+            const tables = lastTables || parseTables();
+            if (!tables) return;
+
+            const xml = generateDrawioXml(tables);
+            const blob = new Blob([xml], { type: "application/xml" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "erd_tables.drawio";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // Preview ban đầu
+        previewBtn.click();
+    </script>
+</body>
+
+</html>
