@@ -794,301 +794,301 @@
     </script> -->
 
 
-    <script>
-    const jsonInput = document.getElementById("jsonInput");
-    const previewBtn = document.getElementById("previewBtn");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const fileInput = document.getElementById("fileInput");
-    const errorBox = document.getElementById("errorBox");
-    const canvas = document.getElementById("canvas");
+    <!-- <script>
+        const jsonInput = document.getElementById("jsonInput");
+        const previewBtn = document.getElementById("previewBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const fileInput = document.getElementById("fileInput");
+        const errorBox = document.getElementById("errorBox");
+        const canvas = document.getElementById("canvas");
 
-    let lastTables = null;
-    let lastRelationships = [];
+        let lastTables = null;
+        let lastRelationships = [];
 
-    function escapeXml(str) {
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&apos;");
-    }
-
-    // Đọc JSON: { tables: [...], relationships: [...] } (format file ERD của bạn)
-    function parseTables() {
-        errorBox.textContent = "";
-        try {
-            const text = jsonInput.value.trim();
-            if (!text) throw new Error("JSON trống.");
-            const obj = JSON.parse(text);
-
-            // Lấy relationships
-            if (obj && Array.isArray(obj.relationships)) {
-                lastRelationships = obj.relationships;
-            } else {
-                lastRelationships = [];
-            }
-
-            // Lấy danh sách bảng
-            let rawTables;
-            if (obj.tables && Array.isArray(obj.tables)) {
-                rawTables = obj.tables;
-            } else if (Array.isArray(obj)) {
-                rawTables = obj;
-            } else {
-                rawTables = [obj];
-            }
-
-            // Chuẩn hoá bảng + field, giữ lại id để mapping relationships
-            const tables = rawTables.map(t => ({
-                rawId: t.id || null,      // id bảng trong JSON
-                name: t.name || "Table",
-                x: typeof t.x === "number" ? t.x : 0,
-                y: typeof t.y === "number" ? t.y : 0,
-                fields: (t.fields || []).map(f => ({
-                    rawId: f.id || null,   // id field trong JSON
-                    name: f.name || "",
-                    type: f.type || "",
-                    isPk: !!f.primary,
-                    isUnique: !!f.unique
-                }))
-            }));
-
-            lastTables = tables;
-            return tables;
-        } catch (e) {
-            errorBox.textContent = "Lỗi parse JSON:\n" + e.message;
-            lastTables = null;
-            lastRelationships = [];
-            return null;
+        function escapeXml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
         }
-    }
 
-    // Vẽ bảng (preview) + gắn data-* để vẽ đường nối
-    function renderPreview(tables) {
-        canvas.innerHTML = "";
-        if (!tables) return;
+        // Đọc JSON: { tables: [...], relationships: [...] } (format file ERD của bạn)
+        function parseTables() {
+            errorBox.textContent = "";
+            try {
+                const text = jsonInput.value.trim();
+                if (!text) throw new Error("JSON trống.");
+                const obj = JSON.parse(text);
 
-        const fragment = document.createDocumentFragment();
-
-        tables.forEach(tbl => {
-            const box = document.createElement("div");
-            box.className = "preview-table";
-            if (tbl.rawId) {
-                box.dataset.tableId = tbl.rawId; // map với relationships.startTableId / endTableId
-            }
-
-            const header = document.createElement("div");
-            header.className = "preview-header";
-            header.textContent = tbl.name || "Table";
-            box.appendChild(header);
-
-            (tbl.fields || []).forEach(f => {
-                const row = document.createElement("div");
-                row.className = "preview-row";
-                if (f.rawId) {
-                    row.dataset.fieldId = f.rawId; // map với relationships.startFieldId / endFieldId
-                }
-
-                const pkCell = document.createElement("div");
-                pkCell.className = "preview-cell";
-                if (f.isPk) {
-                    pkCell.textContent = "PK";
-                } else if (f.isUnique) {
-                    pkCell.textContent = "UQ";
+                // Lấy relationships
+                if (obj && Array.isArray(obj.relationships)) {
+                    lastRelationships = obj.relationships;
                 } else {
-                    pkCell.textContent = "";
+                    lastRelationships = [];
                 }
 
-                const fieldCell = document.createElement("div");
-                fieldCell.className = "preview-cell";
-                fieldCell.textContent = f.name + (f.type ? " : " + f.type : "");
+                // Lấy danh sách bảng
+                let rawTables;
+                if (obj.tables && Array.isArray(obj.tables)) {
+                    rawTables = obj.tables;
+                } else if (Array.isArray(obj)) {
+                    rawTables = obj;
+                } else {
+                    rawTables = [obj];
+                }
 
-                row.appendChild(pkCell);
-                row.appendChild(fieldCell);
-                box.appendChild(row);
+                // Chuẩn hoá bảng + field, giữ lại id để mapping relationships
+                const tables = rawTables.map(t => ({
+                    rawId: t.id || null,      // id bảng trong JSON
+                    name: t.name || "Table",
+                    x: typeof t.x === "number" ? t.x : 0,
+                    y: typeof t.y === "number" ? t.y : 0,
+                    fields: (t.fields || []).map(f => ({
+                        rawId: f.id || null,   // id field trong JSON
+                        name: f.name || "",
+                        type: f.type || "",
+                        isPk: !!f.primary,
+                        isUnique: !!f.unique
+                    }))
+                }));
+
+                lastTables = tables;
+                return tables;
+            } catch (e) {
+                errorBox.textContent = "Lỗi parse JSON:\n" + e.message;
+                lastTables = null;
+                lastRelationships = [];
+                return null;
+            }
+        }
+
+        // Vẽ bảng (preview) + gắn data-* để vẽ đường nối
+        function renderPreview(tables) {
+            canvas.innerHTML = "";
+            if (!tables) return;
+
+            const fragment = document.createDocumentFragment();
+
+            tables.forEach(tbl => {
+                const box = document.createElement("div");
+                box.className = "preview-table";
+                if (tbl.rawId) {
+                    box.dataset.tableId = tbl.rawId; // map với relationships.startTableId / endTableId
+                }
+
+                const header = document.createElement("div");
+                header.className = "preview-header";
+                header.textContent = tbl.name || "Table";
+                box.appendChild(header);
+
+                (tbl.fields || []).forEach(f => {
+                    const row = document.createElement("div");
+                    row.className = "preview-row";
+                    if (f.rawId) {
+                        row.dataset.fieldId = f.rawId; // map với relationships.startFieldId / endFieldId
+                    }
+
+                    const pkCell = document.createElement("div");
+                    pkCell.className = "preview-cell";
+                    if (f.isPk) {
+                        pkCell.textContent = "PK";
+                    } else if (f.isUnique) {
+                        pkCell.textContent = "UQ";
+                    } else {
+                        pkCell.textContent = "";
+                    }
+
+                    const fieldCell = document.createElement("div");
+                    fieldCell.className = "preview-cell";
+                    fieldCell.textContent = f.name + (f.type ? " : " + f.type : "");
+
+                    row.appendChild(pkCell);
+                    row.appendChild(fieldCell);
+                    box.appendChild(row);
+                });
+
+                fragment.appendChild(box);
             });
 
-            fragment.appendChild(box);
-        });
+            canvas.appendChild(fragment);
 
-        canvas.appendChild(fragment);
-
-        // Chờ layout xong rồi vẽ đường FK
-        requestAnimationFrame(drawRelationshipsOverlay);
-    }
-
-    // Vẽ các đường FK lên một SVG overlay trong #canvas
-    function drawRelationshipsOverlay() {
-        // Xoá SVG cũ (nếu có)
-        const oldSvg = canvas.querySelector("svg.preview-svg");
-        if (oldSvg) oldSvg.remove();
-
-        if (!lastRelationships || !lastRelationships.length) return;
-
-        const canvasRect = canvas.getBoundingClientRect();
-        const fullWidth = Math.max(canvas.scrollWidth, canvasRect.width);
-        const fullHeight = Math.max(canvas.scrollHeight, canvasRect.height);
-
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.classList.add("preview-svg");
-        svg.setAttribute("width", fullWidth);
-        svg.setAttribute("height", fullHeight);
-        svg.setAttribute("viewBox", `0 0 ${fullWidth} ${fullHeight}`);
-        svg.style.position = "absolute";
-        svg.style.top = "0";
-        svg.style.left = "0";
-        svg.style.pointerEvents = "none";
-
-        // Lấy toạ độ anchor của 1 field/bảng dựa trên id trong JSON
-        function getAnchor(tableId, fieldId) {
-            let el = null;
-            if (fieldId) {
-                el = canvas.querySelector('.preview-row[data-field-id="' + fieldId + '"]');
-            }
-            if (!el && tableId) {
-                el = canvas.querySelector('.preview-table[data-table-id="' + tableId + '"] .preview-header');
-            }
-            if (!el) return null;
-
-            const r = el.getBoundingClientRect();
-            return {
-                x: r.right - canvasRect.left,
-                y: r.top + r.height / 2 - canvasRect.top
-            };
+            // Chờ layout xong rồi vẽ đường FK
+            requestAnimationFrame(drawRelationshipsOverlay);
         }
 
-        (lastRelationships || []).forEach(rel => {
-            const src = getAnchor(rel.startTableId, rel.startFieldId);
-            const tgt = getAnchor(rel.endTableId, rel.endFieldId);
-            if (!src || !tgt) return;
+        // Vẽ các đường FK lên một SVG overlay trong #canvas
+        function drawRelationshipsOverlay() {
+            // Xoá SVG cũ (nếu có)
+            const oldSvg = canvas.querySelector("svg.preview-svg");
+            if (oldSvg) oldSvg.remove();
 
-            const dx = (tgt.x - src.x) / 2;
+            if (!lastRelationships || !lastRelationships.length) return;
 
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            const d = `M ${src.x} ${src.y} C ${src.x + dx} ${src.y}, ${tgt.x - dx} ${tgt.y}, ${tgt.x} ${tgt.y}`;
-            path.setAttribute("d", d);
-            path.setAttribute("stroke", "#888");
-            path.setAttribute("stroke-width", "1.5");
-            path.setAttribute("fill", "none");
+            const canvasRect = canvas.getBoundingClientRect();
+            const fullWidth = Math.max(canvas.scrollWidth, canvasRect.width);
+            const fullHeight = Math.max(canvas.scrollHeight, canvasRect.height);
 
-            svg.appendChild(path);
-        });
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.classList.add("preview-svg");
+            svg.setAttribute("width", fullWidth);
+            svg.setAttribute("height", fullHeight);
+            svg.setAttribute("viewBox", `0 0 ${fullWidth} ${fullHeight}`);
+            svg.style.position = "absolute";
+            svg.style.top = "0";
+            svg.style.left = "0";
+            svg.style.pointerEvents = "none";
 
-        canvas.appendChild(svg);
-    }
+            // Lấy toạ độ anchor của 1 field/bảng dựa trên id trong JSON
+            function getAnchor(tableId, fieldId) {
+                let el = null;
+                if (fieldId) {
+                    el = canvas.querySelector('.preview-row[data-field-id="' + fieldId + '"]');
+                }
+                if (!el && tableId) {
+                    el = canvas.querySelector('.preview-table[data-table-id="' + tableId + '"] .preview-header');
+                }
+                if (!el) return null;
 
-    // Sinh XML draw.io, vẫn như trước (có relationships)
-    function generateDrawioXml(tables) {
-        let idCounter = 2;
-        const nextId = () => (idCounter++).toString();
+                const r = el.getBoundingClientRect();
+                return {
+                    x: r.right - canvasRect.left,
+                    y: r.top + r.height / 2 - canvasRect.top
+                };
+            }
 
-        const tableWidth = 260;
-        const headerHeight = 30;
-        const rowHeight = 26;
-        const col1Width = 60;
-        const col2Width = tableWidth - col1Width;
+            (lastRelationships || []).forEach(rel => {
+                const src = getAnchor(rel.startTableId, rel.startFieldId);
+                const tgt = getAnchor(rel.endTableId, rel.endFieldId);
+                if (!src || !tgt) return;
 
-        const xs = [];
-        const ys = [];
-        tables.forEach(t => {
-            if (typeof t.x === "number") xs.push(t.x);
-            if (typeof t.y === "number") ys.push(t.y);
-        });
-        const minX = xs.length ? Math.min(...xs) : 0;
-        const minY = ys.length ? Math.min(...ys) : 0;
-        const baseX = 60 - minX;
-        const baseY = 60 - minY;
+                const dx = (tgt.x - src.x) / 2;
 
-        let cellsXml = `
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const d = `M ${src.x} ${src.y} C ${src.x + dx} ${src.y}, ${tgt.x - dx} ${tgt.y}, ${tgt.x} ${tgt.y}`;
+                path.setAttribute("d", d);
+                path.setAttribute("stroke", "#888");
+                path.setAttribute("stroke-width", "1.5");
+                path.setAttribute("fill", "none");
+
+                svg.appendChild(path);
+            });
+
+            canvas.appendChild(svg);
+        }
+
+        // Sinh XML draw.io, vẫn như trước (có relationships)
+        function generateDrawioXml(tables) {
+            let idCounter = 2;
+            const nextId = () => (idCounter++).toString();
+
+            const tableWidth = 260;
+            const headerHeight = 30;
+            const rowHeight = 26;
+            const col1Width = 60;
+            const col2Width = tableWidth - col1Width;
+
+            const xs = [];
+            const ys = [];
+            tables.forEach(t => {
+                if (typeof t.x === "number") xs.push(t.x);
+                if (typeof t.y === "number") ys.push(t.y);
+            });
+            const minX = xs.length ? Math.min(...xs) : 0;
+            const minY = ys.length ? Math.min(...ys) : 0;
+            const baseX = 60 - minX;
+            const baseY = 60 - minY;
+
+            let cellsXml = `
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>`;
 
-        const tableCellIdMap = {};
-        const fieldRowIdMap = {};
+            const tableCellIdMap = {};
+            const fieldRowIdMap = {};
 
-        tables.forEach((tbl, index) => {
-            const fields = tbl.fields || [];
-            const rowsCount = fields.length;
-            const totalHeight = headerHeight + rowsCount * rowHeight;
+            tables.forEach((tbl, index) => {
+                const fields = tbl.fields || [];
+                const rowsCount = fields.length;
+                const totalHeight = headerHeight + rowsCount * rowHeight;
 
-            const x = typeof tbl.x === "number"
-                ? Math.round(tbl.x + baseX)
-                : 60 + index * (tableWidth + 40);
-            const y = typeof tbl.y === "number"
-                ? Math.round(tbl.y + baseY)
-                : 60;
+                const x = typeof tbl.x === "number"
+                    ? Math.round(tbl.x + baseX)
+                    : 60 + index * (tableWidth + 40);
+                const y = typeof tbl.y === "number"
+                    ? Math.round(tbl.y + baseY)
+                    : 60;
 
-            const tableId = nextId();
+                const tableId = nextId();
 
-            if (tbl.rawId) {
-                tableCellIdMap[tbl.rawId] = tableId;
-            }
+                if (tbl.rawId) {
+                    tableCellIdMap[tbl.rawId] = tableId;
+                }
 
-            cellsXml += `
+                cellsXml += `
         <mxCell id="${tableId}" value="${escapeXml(tbl.name || "Table")}"
           style="shape=table;startSize=${headerHeight};container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=1;fontStyle=1;align=center;resizeLast=1;html=1;strokeColor=default;"
           vertex="1" parent="1">
           <mxGeometry x="${x}" y="${y}" width="${tableWidth}" height="${totalHeight}" as="geometry"/>
         </mxCell>`;
 
-            fields.forEach((f, idx) => {
-                const rowId = nextId();
-                const yRow = headerHeight + idx * rowHeight;
+                fields.forEach((f, idx) => {
+                    const rowId = nextId();
+                    const yRow = headerHeight + idx * rowHeight;
 
-                if (f.rawId) {
-                    fieldRowIdMap[f.rawId] = rowId;
-                }
+                    if (f.rawId) {
+                        fieldRowIdMap[f.rawId] = rowId;
+                    }
 
-                cellsXml += `
+                    cellsXml += `
         <mxCell id="${rowId}" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="${tableId}">
           <mxGeometry y="${yRow}" width="${tableWidth}" height="${rowHeight}" as="geometry"/>
         </mxCell>`;
 
-                const pkText = f.isPk ? "PK" : (f.isUnique ? "UQ" : "");
-                const pkCellId = nextId();
-                cellsXml += `
+                    const pkText = f.isPk ? "PK" : (f.isUnique ? "UQ" : "");
+                    const pkCellId = nextId();
+                    cellsXml += `
         <mxCell id="${pkCellId}" value="${escapeXml(pkText)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=center;verticalAlign=middle;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
           <mxGeometry width="${col1Width}" height="${rowHeight}" as="geometry">
             <mxRectangle width="${col1Width}" height="${rowHeight}" as="alternateBounds"/>
           </mxGeometry>
         </mxCell>`;
 
-                const fieldLabel = f.name + (f.type ? " : " + f.type : "");
-                const fieldCellId = nextId();
-                cellsXml += `
+                    const fieldLabel = f.name + (f.type ? " : " + f.type : "");
+                    const fieldCellId = nextId();
+                    cellsXml += `
         <mxCell id="${fieldCellId}" value="${escapeXml(fieldLabel)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
           <mxGeometry x="${col1Width}" width="${col2Width}" height="${rowHeight}" as="geometry">
             <mxRectangle width="${col2Width}" height="${rowHeight}" as="alternateBounds"/>
           </mxGeometry>
         </mxCell>`;
+                });
             });
-        });
 
-        // Thêm đường FK giống lúc xuất file
-        const rels = Array.isArray(lastRelationships) ? lastRelationships : [];
-        rels.forEach(rel => {
-            const sourceId =
-                fieldRowIdMap[rel.startFieldId] ||
-                tableCellIdMap[rel.startTableId];
+            // Thêm đường FK giống lúc xuất file
+            const rels = Array.isArray(lastRelationships) ? lastRelationships : [];
+            rels.forEach(rel => {
+                const sourceId =
+                    fieldRowIdMap[rel.startFieldId] ||
+                    tableCellIdMap[rel.startTableId];
 
-            const targetId =
-                fieldRowIdMap[rel.endFieldId] ||
-                tableCellIdMap[rel.endTableId];
+                const targetId =
+                    fieldRowIdMap[rel.endFieldId] ||
+                    tableCellIdMap[rel.endTableId];
 
-            if (!sourceId || !targetId) return;
+                if (!sourceId || !targetId) return;
 
-            const edgeId = nextId();
-            cellsXml += `
+                const edgeId = nextId();
+                cellsXml += `
         <mxCell id="${edgeId}" value=""
           style="endArrow=block;endFill=1;html=1;strokeColor=#666666;"
           edge="1" parent="1" source="${sourceId}" target="${targetId}">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>`;
-        });
+            });
 
-        const xml =
-            `<mxfile host="app.diagrams.net">
+            const xml =
+                `<mxfile host="app.diagrams.net">
   <diagram name="ERD">
     <mxGraphModel dx="1030" dy="583" grid="1" gridSize="10" guides="1" tooltips="1"
                   connect="1" arrows="1" fold="1" page="1" pageScale="1"
@@ -1099,50 +1099,446 @@
   </diagram>
 </mxfile>`;
 
-        return xml;
-    }
+            return xml;
+        }
 
-    // Upload JSON
-    fileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        // Upload JSON
+        fileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            jsonInput.value = evt.target.result;
-            previewBtn.click();
-        };
-        reader.readAsText(file, "utf-8");
-    });
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                jsonInput.value = evt.target.result;
+                previewBtn.click();
+            };
+            reader.readAsText(file, "utf-8");
+        });
 
-    // Preview
-    previewBtn.addEventListener("click", () => {
-        const tables = parseTables();
-        if (!tables) return;
-        renderPreview(tables);
-    });
+        // Preview
+        previewBtn.addEventListener("click", () => {
+            const tables = parseTables();
+            if (!tables) return;
+            renderPreview(tables);
+        });
 
-    // Download .drawio
-    downloadBtn.addEventListener("click", () => {
-        const tables = lastTables || parseTables();
-        if (!tables) return;
+        // Download .drawio
+        downloadBtn.addEventListener("click", () => {
+            const tables = lastTables || parseTables();
+            if (!tables) return;
 
-        const xml = generateDrawioXml(tables);
-        const blob = new Blob([xml], { type: "application/xml" });
-        const url = URL.createObjectURL(blob);
+            const xml = generateDrawioXml(tables);
+            const blob = new Blob([xml], { type: "application/xml" });
+            const url = URL.createObjectURL(blob);
 
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "erd_tables.drawio";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    });
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "erd_tables.drawio";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
 
-    // Preview ban đầu
-    previewBtn.click();
-</script>
+        // Preview ban đầu
+        previewBtn.click();
+    </script> -->
+
+
+    <script>
+        const jsonInput = document.getElementById("jsonInput");
+        const previewBtn = document.getElementById("previewBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const fileInput = document.getElementById("fileInput");
+        const errorBox = document.getElementById("errorBox");
+        const canvas = document.getElementById("canvas");
+
+        let lastTables = null;
+        let lastRelationships = [];
+
+        function escapeXml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        }
+
+        // Map cardinality JSON -> label
+        function getCardinalityLabel(rel) {
+            switch (rel.cardinality) {
+                case "one_to_one":
+                    return "1..1";
+                case "one_to_many":
+                    return "1..N";
+                case "many_to_one":
+                    return "N..1";
+                case "many_to_many":
+                    return "N..N";
+                default:
+                    // fallback: show raw string nếu có
+                    return rel.cardinality || "";
+            }
+        }
+
+        // Đọc JSON: { tables: [...], relationships: [...] }
+        function parseTables() {
+            errorBox.textContent = "";
+            try {
+                const text = jsonInput.value.trim();
+                if (!text) throw new Error("JSON trống.");
+                const obj = JSON.parse(text);
+
+                // Lấy relationships
+                if (obj && Array.isArray(obj.relationships)) {
+                    lastRelationships = obj.relationships;
+                } else {
+                    lastRelationships = [];
+                }
+
+                // Lấy danh sách bảng
+                let rawTables;
+                if (obj.tables && Array.isArray(obj.tables)) {
+                    rawTables = obj.tables;
+                } else if (Array.isArray(obj)) {
+                    rawTables = obj;
+                } else {
+                    rawTables = [obj];
+                }
+
+                // Chuẩn hoá bảng + field, giữ lại id để mapping relationships
+                const tables = rawTables.map(t => ({
+                    rawId: t.id || null,      // id bảng trong JSON
+                    name: t.name || "Table",
+                    x: typeof t.x === "number" ? t.x : 0,
+                    y: typeof t.y === "number" ? t.y : 0,
+                    fields: (t.fields || []).map(f => ({
+                        rawId: f.id || null,   // id field trong JSON
+                        name: f.name || "",
+                        type: f.type || "",
+                        isPk: !!f.primary,
+                        isUnique: !!f.unique
+                    }))
+                }));
+
+                lastTables = tables;
+                return tables;
+            } catch (e) {
+                errorBox.textContent = "Lỗi parse JSON:\n" + e.message;
+                lastTables = null;
+                lastRelationships = [];
+                return null;
+            }
+        }
+
+        // Vẽ bảng (preview) + gắn data-* để vẽ đường nối
+        function renderPreview(tables) {
+            canvas.innerHTML = "";
+            if (!tables) return;
+
+            const fragment = document.createDocumentFragment();
+
+            tables.forEach(tbl => {
+                const box = document.createElement("div");
+                box.className = "preview-table";
+                if (tbl.rawId) {
+                    box.dataset.tableId = tbl.rawId; // map với relationships.startTableId / endTableId
+                }
+
+                const header = document.createElement("div");
+                header.className = "preview-header";
+                header.textContent = tbl.name || "Table";
+                box.appendChild(header);
+
+                (tbl.fields || []).forEach(f => {
+                    const row = document.createElement("div");
+                    row.className = "preview-row";
+                    if (f.rawId) {
+                        row.dataset.fieldId = f.rawId; // map với relationships.startFieldId / endFieldId
+                    }
+
+                    const pkCell = document.createElement("div");
+                    pkCell.className = "preview-cell";
+                    if (f.isPk) {
+                        pkCell.textContent = "PK";
+                    } else if (f.isUnique) {
+                        pkCell.textContent = "UQ";
+                    } else {
+                        pkCell.textContent = "";
+                    }
+
+                    const fieldCell = document.createElement("div");
+                    fieldCell.className = "preview-cell";
+                    fieldCell.textContent = f.name + (f.type ? " : " + f.type : "");
+
+                    row.appendChild(pkCell);
+                    row.appendChild(fieldCell);
+                    box.appendChild(row);
+                });
+
+                fragment.appendChild(box);
+            });
+
+            canvas.appendChild(fragment);
+
+            // Chờ layout xong rồi vẽ đường FK
+            requestAnimationFrame(drawRelationshipsOverlay);
+        }
+
+        // Vẽ các đường FK lên một SVG overlay trong #canvas + label cardinality
+        function drawRelationshipsOverlay() {
+            // Xoá SVG cũ (nếu có)
+            const oldSvg = canvas.querySelector("svg.preview-svg");
+            if (oldSvg) oldSvg.remove();
+
+            if (!lastRelationships || !lastRelationships.length) return;
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const fullWidth = Math.max(canvas.scrollWidth, canvasRect.width);
+            const fullHeight = Math.max(canvas.scrollHeight, canvasRect.height);
+
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.classList.add("preview-svg");
+            svg.setAttribute("width", fullWidth);
+            svg.setAttribute("height", fullHeight);
+            svg.setAttribute("viewBox", `0 0 ${fullWidth} ${fullHeight}`);
+            svg.style.position = "absolute";
+            svg.style.top = "0";
+            svg.style.left = "0";
+            svg.style.pointerEvents = "none";
+
+            // Lấy toạ độ anchor của 1 field/bảng dựa trên id trong JSON
+            function getAnchor(tableId, fieldId) {
+                let el = null;
+                if (fieldId) {
+                    el = canvas.querySelector('.preview-row[data-field-id="' + fieldId + '"]');
+                }
+                if (!el && tableId) {
+                    el = canvas.querySelector('.preview-table[data-table-id="' + tableId + '"] .preview-header');
+                }
+                if (!el) return null;
+
+                const r = el.getBoundingClientRect();
+                return {
+                    x: r.right - canvasRect.left,
+                    y: r.top + r.height / 2 - canvasRect.top
+                };
+            }
+
+            (lastRelationships || []).forEach(rel => {
+                const src = getAnchor(rel.startTableId, rel.startFieldId);
+                const tgt = getAnchor(rel.endTableId, rel.endFieldId);
+                if (!src || !tgt) return;
+
+                const dx = (tgt.x - src.x) / 2;
+
+                // Đường cong
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const d = `M ${src.x} ${src.y} C ${src.x + dx} ${src.y}, ${tgt.x - dx} ${tgt.y}, ${tgt.x} ${tgt.y}`;
+                path.setAttribute("d", d);
+                path.setAttribute("stroke", "#888");
+                path.setAttribute("stroke-width", "1.5");
+                path.setAttribute("fill", "none");
+                svg.appendChild(path);
+
+                // Label cardinality
+                const label = getCardinalityLabel(rel);
+                if (label) {
+                    const mx = (src.x + tgt.x) / 2;
+                    const my = (src.y + tgt.y) / 2 - 4; // hơi lệch lên cho đẹp
+
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", mx);
+                    text.setAttribute("y", my);
+                    text.setAttribute("font-size", "10");
+                    text.setAttribute("fill", "#444");
+                    text.setAttribute("text-anchor", "middle");
+                    text.setAttribute("dominant-baseline", "central");
+                    text.textContent = label;
+
+                    svg.appendChild(text);
+                }
+            });
+
+            canvas.appendChild(svg);
+        }
+
+        // Sinh XML draw.io, thêm label cardinality cho edge
+        function generateDrawioXml(tables) {
+            let idCounter = 2;
+            const nextId = () => (idCounter++).toString();
+
+            const tableWidth = 260;
+            const headerHeight = 30;
+            const rowHeight = 26;
+            const col1Width = 60;
+            const col2Width = tableWidth - col1Width;
+
+            const xs = [];
+            const ys = [];
+            tables.forEach(t => {
+                if (typeof t.x === "number") xs.push(t.x);
+                if (typeof t.y === "number") ys.push(t.y);
+            });
+            const minX = xs.length ? Math.min(...xs) : 0;
+            const minY = ys.length ? Math.min(...ys) : 0;
+            const baseX = 60 - minX;
+            const baseY = 60 - minY;
+
+            let cellsXml = `
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>`;
+
+            const tableCellIdMap = {};
+            const fieldRowIdMap = {};
+
+            tables.forEach((tbl, index) => {
+                const fields = tbl.fields || [];
+                const rowsCount = fields.length;
+                const totalHeight = headerHeight + rowsCount * rowHeight;
+
+                const x = typeof tbl.x === "number"
+                    ? Math.round(tbl.x + baseX)
+                    : 60 + index * (tableWidth + 40);
+                const y = typeof tbl.y === "number"
+                    ? Math.round(tbl.y + baseY)
+                    : 60;
+
+                const tableId = nextId();
+
+                if (tbl.rawId) {
+                    tableCellIdMap[tbl.rawId] = tableId;
+                }
+
+                cellsXml += `
+        <mxCell id="${tableId}" value="${escapeXml(tbl.name || "Table")}"
+          style="shape=table;startSize=${headerHeight};container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=1;fontStyle=1;align=center;resizeLast=1;html=1;strokeColor=default;"
+          vertex="1" parent="1">
+          <mxGeometry x="${x}" y="${y}" width="${tableWidth}" height="${totalHeight}" as="geometry"/>
+        </mxCell>`;
+
+                fields.forEach((f, idx) => {
+                    const rowId = nextId();
+                    const yRow = headerHeight + idx * rowHeight;
+
+                    if (f.rawId) {
+                        fieldRowIdMap[f.rawId] = rowId;
+                    }
+
+                    cellsXml += `
+        <mxCell id="${rowId}" value="" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;fillColor=none;collapsible=0;dropTarget=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;" vertex="1" parent="${tableId}">
+          <mxGeometry y="${yRow}" width="${tableWidth}" height="${rowHeight}" as="geometry"/>
+        </mxCell>`;
+
+                    const pkText = f.isPk ? "PK" : (f.isUnique ? "UQ" : "");
+                    const pkCellId = nextId();
+                    cellsXml += `
+        <mxCell id="${pkCellId}" value="${escapeXml(pkText)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=center;verticalAlign=middle;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+          <mxGeometry width="${col1Width}" height="${rowHeight}" as="geometry">
+            <mxRectangle width="${col1Width}" height="${rowHeight}" as="alternateBounds"/>
+          </mxGeometry>
+        </mxCell>`;
+
+                    const fieldLabel = f.name + (f.type ? " : " + f.type : "");
+                    const fieldCellId = nextId();
+                    cellsXml += `
+        <mxCell id="${fieldCellId}" value="${escapeXml(fieldLabel)}" style="shape=partialRectangle;connectable=0;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" vertex="1" parent="${rowId}">
+          <mxGeometry x="${col1Width}" width="${col2Width}" height="${rowHeight}" as="geometry">
+            <mxRectangle width="${col2Width}" height="${rowHeight}" as="alternateBounds"/>
+          </mxGeometry>
+        </mxCell>`;
+                });
+            });
+
+            // Thêm đường FK giống lúc xuất file, có label cardinality
+            const rels = Array.isArray(lastRelationships) ? lastRelationships : [];
+            rels.forEach(rel => {
+                const sourceId =
+                    fieldRowIdMap[rel.startFieldId] ||
+                    tableCellIdMap[rel.startTableId];
+
+                const targetId =
+                    fieldRowIdMap[rel.endFieldId] ||
+                    tableCellIdMap[rel.endTableId];
+
+                if (!sourceId || !targetId) return;
+
+                const edgeId = nextId();
+                const label = getCardinalityLabel(rel);
+
+        //         cellsXml += `
+        // <mxCell id="${edgeId}" value="${escapeXml(label)}"
+        //   style="endArrow=block;endFill=1;html=1;strokeColor=#666666;"
+        //   edge="1" parent="1" source="${sourceId}" target="${targetId}">
+        //   <mxGeometry relative="1" as="geometry"/>
+        // </mxCell>`;
+        //     });
+
+        cellsXml += `
+        <mxCell id="${edgeId}" value="${escapeXml(label)}"
+          style="endArrow=none;html=1;strokeColor=#666666;"
+          edge="1" parent="1" source="${sourceId}" target="${targetId}">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>`; });
+
+
+            const xml =
+                `<mxfile host="app.diagrams.net">
+  <diagram name="ERD">
+    <mxGraphModel dx="1030" dy="583" grid="1" gridSize="10" guides="1" tooltips="1"
+                  connect="1" arrows="1" fold="1" page="1" pageScale="1"
+                  pageWidth="827" pageHeight="1169" math="0">
+      <root>${cellsXml}
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+
+            return xml;
+        }
+
+        // Upload JSON
+        fileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                jsonInput.value = evt.target.result;
+                previewBtn.click();
+            };
+            reader.readAsText(file, "utf-8");
+        });
+
+        // Preview
+        previewBtn.addEventListener("click", () => {
+            const tables = parseTables();
+            if (!tables) return;
+            renderPreview(tables);
+        });
+
+        // Download .drawio
+        downloadBtn.addEventListener("click", () => {
+            const tables = lastTables || parseTables();
+            if (!tables) return;
+
+            const xml = generateDrawioXml(tables);
+            const blob = new Blob([xml], { type: "application/xml" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "erd_tables.drawio";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // Preview ban đầu
+        previewBtn.click();
+    </script>
 
 </body>
 
